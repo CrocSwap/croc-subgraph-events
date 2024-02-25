@@ -184,9 +184,8 @@ export function modifyLiquidity(transaction: Bytes, userAddress: Address, blockN
 
   const eventIndex = getNextCallIndex(AGG_ENTITY_LABEL, transaction)
 
-  const agg = new AggEvent(getUniqueCallID(transaction, callIndex))
+  const agg = new AggEvent(getUniqueCallID(transaction, eventIndex))
   agg.transactionHash = transaction
-  agg.eventIndex = callIndex
   agg.block = blockNumber
   agg.eventIndex = eventIndex
   agg.time = timestamp
@@ -249,7 +248,7 @@ export function handleSwap(transaction: Bytes, userAddress: Address, poolHash: B
 
   const eventIndex = getNextCallIndex(AGG_ENTITY_LABEL, transaction)
 
-  const agg = new AggEvent(getUniqueCallID(transaction, callIndex))
+  const agg = new AggEvent(getUniqueCallID(transaction, eventIndex))
   agg.transactionHash = transaction
   agg.eventIndex = eventIndex
   agg.block = blockNumber
@@ -395,7 +394,7 @@ export function handleDirectSwapEvent(event: CrocSwap): void {
 
 /************************ HANDLERS FOR HOTPROXY SWAPS ************************/
 
-export function handleHotProxy(inputs: Bytes, transaction: ethereum.Transaction, block: ethereum.Block, callSource: string): void {
+export function handleHotProxy(inputs: Bytes, baseFlow: BigInt, quoteFlow: BigInt, transaction: ethereum.Transaction, block: ethereum.Block, callSource: string): void {
   const params = decodeAbi(inputs, "(address,address,uint256,bool,bool,uint128,uint16,uint128,uint128,uint8)")
   const base = params[0].toAddress()
   const quote = params[1].toAddress()
@@ -417,8 +416,8 @@ export function handleHotProxy(inputs: Bytes, transaction: ethereum.Transaction,
     qty,
     limitPrice,
     minOut,
-    BigInt.fromI32(0), // replace
-    BigInt.fromI32(0), // replace
+    baseFlow,
+    quoteFlow,
     callSource,
     "croc"
   )
@@ -426,12 +425,13 @@ export function handleHotProxy(inputs: Bytes, transaction: ethereum.Transaction,
 
 // Handler for a userCmd() swap call made to HotProxy
 export function handleHotProxyCall(call: HotProxyUserCmdCall): void {
-  handleHotProxy(call.inputs.input, call.transaction, call.block, "hotproxy")
+  handleHotProxy(call.inputs.input, call.outputs.baseFlow, call.outputs.quoteFlow, 
+    call.transaction, call.block, "hotproxy")
 }
 
 // event CrocHotCmd (bytes input, int128 baseFlow, int128 quoteFlow);
 export function handleHotProxyEvent(event: CrocHotCmd): void {
-  handleHotProxy(event.params.input, event.transaction, event.block, "hotproxy_event")
+  handleHotProxy(event.params.input, event.params.baseFlow, event.params.quoteFlow, event.transaction, event.block, "hotproxy_event")
 }
 
 /******************* HANDLERS FOR COLDPATH USERCMD() CALLS *******************/
@@ -793,9 +793,9 @@ export function handleSweepSwapCall(call: SweepSwapCall): void {
 
 // event CrocMicroSwap(bytes input, bytes output);
 export function handleSweepSwapEvent(event: CrocMicroSwap): void {
-  //const inputs = decodeAbi(event.params.input, "((uint128,uint128,uint128,uint64,uint64),int24,(bool,bool,uint8,uint128,uint128),((uint8,uint16,uint8,uint16,uint8,uint8,uint8),bytes32,address))")
-  //const outputs = decodeAbi(event.params.output, "((int128,int128,uint128,uint128),uint128,uint128,uint128,uint64,uint64)")
-  /* const poolHash = inputs[18].toBytes()
+  const inputs = decodeAbi(event.params.input, "(uint128,uint128,uint128,uint64,uint64,int24,bool,bool,uint8,uint128,uint128,uint8,uint16,uint8,uint16,uint8,uint8,uint8,bytes32,address)")
+  const outputs = decodeAbi(event.params.output, "(int128,int128,uint128,uint128,uint128,uint128,uint128,uint64,uint64)")
+  const poolHash = inputs[18].toBytes()
   const isBuy = inputs[6].toBoolean()
   const inBaseQty = inputs[7].toBoolean()
   const qty = inputs[9].toBigInt()
@@ -819,7 +819,7 @@ export function handleSweepSwapEvent(event: CrocMicroSwap): void {
     quoteFlow,
     "micropath_event",
     "croc"
-  ) */
+  )
 }
 
 /************** HANDLERS FOR KNOCKOUTLIQPATH KNOCKOUTCMD() CALLS *************/
