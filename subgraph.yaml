@@ -7,7 +7,7 @@ dataSources:
     network: blast-testnet
     source:
       abi: CrocSwapDex
-      address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
+      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
       startBlock: 2215723
     mapping:
       kind: ethereum/events
@@ -28,7 +28,7 @@ dataSources:
     network: blast-testnet
     source:
       abi: HotProxy
-      address: "0xaaaaAAAACB71BF2C8CaE522EA5fa455571A74106"
+      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
       startBlock: 2215723
     mapping:
       kind: ethereum/events
@@ -42,13 +42,16 @@ dataSources:
       eventHandlers:
         - event: CrocHotCmd(bytes,int128,int128)
           handler: handleHotProxyEvent
+        - event: CrocSwap(indexed address,indexed
+            address,uint256,bool,bool,uint128,uint16,uint128,uint128,uint8,int128,int128)
+          handler: handleDirectSwapEvent
       file: ./src/mapping.ts
   - kind: ethereum
     name: ColdPath
     network: blast-testnet
     source:
       abi: ColdPath
-      address: "0xaaaaAAAACB71BF2C8CaE522EA5fa455571A74106"
+      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
       startBlock: 2215723
     mapping:
       kind: ethereum/events
@@ -70,7 +73,7 @@ dataSources:
     network: blast-testnet
     source:
       abi: WarmPath
-      address: "0xaaaaAAAACB71BF2C8CaE522EA5fa455571A74106"
+      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
       startBlock: 2215723
     mapping:
       kind: ethereum/events
@@ -91,7 +94,7 @@ dataSources:
     network: blast-testnet
     source:
       abi: MicroPaths
-      address: "0xaaaaAAAACB71BF2C8CaE522EA5fa455571A74106"
+      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
       startBlock: 2215723
     mapping:
       kind: ethereum/events
@@ -121,7 +124,7 @@ dataSources:
     network: blast-testnet
     source:
       abi: KnockoutLiqPath
-      address: "0xaaaaAAAACB71BF2C8CaE522EA5fa455571A74106"
+      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
       startBlock: 2215723
     mapping:
       kind: ethereum/events
@@ -142,7 +145,7 @@ dataSources:
     network: blast-testnet
     source:
       abi: KnockoutCounter
-      address: "0xaaaaAAAACB71BF2C8CaE522EA5fa455571A74106"
+      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
       startBlock: 2215723
     mapping:
       kind: ethereum/events
