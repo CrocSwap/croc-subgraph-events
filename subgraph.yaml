@@ -4,11 +4,11 @@ schema:
 dataSources:
   - kind: ethereum
     name: CrocSwapDex
-    network: scroll
+    network: blast-testnet
     source:
       abi: CrocSwapDex
-      address: "0xaaaaAAAACB71BF2C8CaE522EA5fa455571A74106"
-      startBlock: 267408
+      address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
+      startBlock: 2215723
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
@@ -25,11 +25,11 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: HotProxy
-    network: scroll
+    network: blast-testnet
     source:
       abi: HotProxy
       address: "0xaaaaAAAACB71BF2C8CaE522EA5fa455571A74106"
-      startBlock: 267408
+      startBlock: 2215723
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
@@ -45,11 +45,11 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: ColdPath
-    network: scroll
+    network: blast-testnet
     source:
       abi: ColdPath
       address: "0xaaaaAAAACB71BF2C8CaE522EA5fa455571A74106"
-      startBlock: 267408
+      startBlock: 2215723
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
@@ -67,11 +67,11 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: WarmPath
-    network: scroll
+    network: blast-testnet
     source:
       abi: WarmPath
       address: "0xaaaaAAAACB71BF2C8CaE522EA5fa455571A74106"
-      startBlock: 267408
+      startBlock: 2215723
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
@@ -88,11 +88,11 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: MicroPaths
-    network: scroll
+    network: blast-testnet
     source:
       abi: MicroPaths
       address: "0xaaaaAAAACB71BF2C8CaE522EA5fa455571A74106"
-      startBlock: 267408
+      startBlock: 2215723
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
@@ -118,11 +118,11 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: KnockoutLiqPath
-    network: scroll
+    network: blast-testnet
     source:
       abi: KnockoutLiqPath
       address: "0xaaaaAAAACB71BF2C8CaE522EA5fa455571A74106"
-      startBlock: 267408
+      startBlock: 2215723
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
@@ -139,11 +139,11 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: KnockoutCounter
-    network: scroll
+    network: blast-testnet
     source:
       abi: KnockoutCounter
       address: "0xaaaaAAAACB71BF2C8CaE522EA5fa455571A74106"
-      startBlock: 267408
+      startBlock: 2215723
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
