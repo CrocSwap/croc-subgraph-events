@@ -4,11 +4,11 @@ schema:
 dataSources:
   - kind: ethereum
     name: CrocSwapDex
-    network: blast-testnet
+    network: blast-mainnet
     source:
       abi: CrocSwapDex
-      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
-      startBlock: 2215723
+      address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
+      startBlock: 1
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
@@ -25,11 +25,11 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: HotProxy
-    network: blast-testnet
+    network: blast-mainnet
     source:
       abi: HotProxy
-      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
-      startBlock: 2215723
+      address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
+      startBlock: 1
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
@@ -45,11 +45,11 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: ColdPath
-    network: blast-testnet
+    network: blast-mainnet
     source:
       abi: ColdPath
-      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
-      startBlock: 2215723
+      address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
+      startBlock: 1
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
@@ -67,11 +67,11 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: WarmPath
-    network: blast-testnet
+    network: blast-mainnet
     source:
       abi: WarmPath
-      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
-      startBlock: 2215723
+      address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
+      startBlock: 1
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
@@ -88,11 +88,11 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: MicroPaths
-    network: blast-testnet
+    network: blast-mainnet
     source:
       abi: MicroPaths
-      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
-      startBlock: 2215723
+      address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
+      startBlock: 1
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
@@ -118,11 +118,11 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: KnockoutLiqPath
-    network: blast-testnet
+    network: blast-mainnet
     source:
       abi: KnockoutLiqPath
-      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
-      startBlock: 2215723
+      address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
+      startBlock: 1
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
@@ -139,11 +139,11 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: KnockoutCounter
-    network: blast-testnet
+    network: blast-mainnet
     source:
       abi: KnockoutCounter
-      address: "0xf65976C7f25b6320c7CD81b1db10cEe97F2bb7AC"
-      startBlock: 2215723
+      address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
+      startBlock: 1
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
