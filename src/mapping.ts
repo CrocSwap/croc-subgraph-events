@@ -99,8 +99,8 @@ export function getKnockoutCrossHash(block: BigInt, transaction: Bytes, poolHash
 }
 
 // Generates unique hash for a UserBalance object denoting that a given user has interacted with a given token
-export function getUserBalanceHash(user: Address, token: Address): Bytes {
-  return user.concat(token)
+export function getUserBalanceHash(user: Address, token: Address, category: string): Bytes {
+  return user.concat(token).concat(Bytes.fromByteArray(ByteArray.fromUTF8(category)))
 }
 
 export function getLatestIndexID(entityType: String, transaction: Bytes): Bytes {
@@ -178,8 +178,8 @@ export function modifyLiquidity(transaction: Bytes, userAddress: Address, blockN
   saveCallIndex(entityType, transaction, callIndex)
 
   if (changeType === "burn" || changeType === "harvest") {
-    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.base))
-    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote))
+    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.base), "burn")
+    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote), "burn")
   }
 
   const eventIndex = getNextCallIndex(AGG_ENTITY_LABEL, transaction)
@@ -242,8 +242,8 @@ export function handleSwap(transaction: Bytes, userAddress: Address, poolHash: B
   saveCallIndex(entityType, transaction, callIndex)
 
   if (dex === "croc") {
-    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.base))
-    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote))
+    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.base), "swap")
+    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote), "swap")
   }
 
   const eventIndex = getNextCallIndex(AGG_ENTITY_LABEL, transaction)
@@ -271,8 +271,8 @@ export function handleSwap(transaction: Bytes, userAddress: Address, poolHash: B
   saveCallIndex(AGG_ENTITY_LABEL, transaction, eventIndex)
 }
 
-export function handleBalanceChange(transaction: Bytes, blockNumber: BigInt, timestamp: BigInt, user: Address, token: Address): void {
-  const balanceHash = getUserBalanceHash(user, token)
+export function handleBalanceChange(transaction: Bytes, blockNumber: BigInt, timestamp: BigInt, user: Address, token: Address, category: string): void {
+  const balanceHash = getUserBalanceHash(user, token, category)
   const userBalance = UserBalance.load(balanceHash)
   if (userBalance === null) {
     const userBalance_ = new UserBalance(balanceHash)
@@ -281,6 +281,7 @@ export function handleBalanceChange(transaction: Bytes, blockNumber: BigInt, tim
     userBalance_.time = timestamp
     userBalance_.user = user
     userBalance_.token = token
+    userBalance_.category = category
     userBalance_.save()
   }
 }
@@ -459,7 +460,8 @@ export function handleColdPath(inputs: Bytes, transaction: ethereum.Transaction,
       block.number,
       block.timestamp,
       recv,
-      token
+      token,
+      cmdCode == depositSurplusCode ? "deposit" : "withdraw",
     )
   }
 }

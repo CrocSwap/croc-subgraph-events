@@ -112,6 +112,7 @@ type UserBalance @entity(immutable: true) {
   time: BigInt!
   user: Bytes!
   token: Bytes!
+  category: String!
 }
 
 """
