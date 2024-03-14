@@ -116,6 +116,21 @@ type UserBalance @entity(immutable: true) {
 }
 
 """
+A DexBalanceUpdate entity represents a potential change to a user's internal DEX
+balance for a given token. 
+"""
+type DexBalanceUpdate @entity(immutable: true) {
+  id: Bytes!
+  transactionHash: Bytes!
+  eventIndex: Int!
+  block: BigInt!
+  time: BigInt!
+  user: Bytes!
+  token: Bytes!
+  category: String!
+}
+
+"""
 LatestIndex entities are used to help perform bookkeeping related to the
 generation of unique event IDs in the case where multiple identical entities
 would otherwise be created within the same transaction.

@@ -19,7 +19,7 @@ import { CrocKnockoutCmd } from "../generated/KnockoutLiqPath/KnockoutLiqPath"
 
 // Import interfaces for the KnockoutCross event
 import { CrocKnockoutCross } from "../generated/KnockoutCounter/KnockoutCounter"
-import { AggEvent, FeeChange, KnockoutCross, LatestIndex, LiquidityChange, Pool, PoolTemplate, Swap, UserBalance } from "../generated/schema"
+import { AggEvent, DexBalanceUpdate, FeeChange, KnockoutCross, LatestIndex, LiquidityChange, Pool, PoolTemplate, Swap, UserBalance } from "../generated/schema"
 
 /***************************** DATA MANIPULATION *****************************/
 // Conversions between different data types, unpacking packed data, etc.
@@ -149,7 +149,10 @@ export function saveCallIndex(entityType: String, transaction: Bytes, callIndex:
 
 // Handles liquidity modification (additions, burns, mints) via
 // LiquidityChange (per-transaction) entities
-export function modifyLiquidity(transaction: Bytes, userAddress: Address, blockNumber: BigInt, timestamp: BigInt, poolHash: Bytes, positionType: string, changeType: string, bidTick: i32, askTick: i32, isBid: boolean, liq: BigInt | null, baseFlow: BigInt | null, quoteFlow: BigInt | null, callSource: string, pivotTime: BigInt | null): void {
+export function modifyLiquidity(transaction: Bytes, userAddress: Address, blockNumber: BigInt, timestamp: BigInt, poolHash: Bytes, positionType: string, 
+  changeType: string, bidTick: i32, askTick: i32, isBid: boolean, liq: BigInt | null, 
+  baseFlow: BigInt | null, quoteFlow: BigInt | null, callSource: string, 
+  pivotTime: BigInt | null, canTouchDexDeposit: boolean): void {
   // Get unique entity ID
   const entityType = "liquidityChange"
   const callIndex = getNextCallIndex(entityType, transaction)
@@ -182,6 +185,11 @@ export function modifyLiquidity(transaction: Bytes, userAddress: Address, blockN
     handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote), "burn")
   }
 
+  if (canTouchDexDeposit) {
+    handleDexBalance(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.base), changeType)
+    handleDexBalance(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote), changeType)
+  }  
+
   const eventIndex = getNextCallIndex(AGG_ENTITY_LABEL, transaction)
 
   const agg = new AggEvent(getUniqueCallID(transaction, eventIndex))
@@ -208,7 +216,10 @@ export function modifyLiquidity(transaction: Bytes, userAddress: Address, blockN
 }
 
 // Creates Swap entities
-export function handleSwap(transaction: Bytes, userAddress: Address, poolHash: Bytes, blockNumber: BigInt, transactionIndex: BigInt, timestamp: BigInt, isBuy: boolean, inBaseQty: boolean, qty: BigInt, limitPrice: BigInt | null, minOut: BigInt | null, baseFlow: BigInt, quoteFlow: BigInt, callSource: string, dex: string): void {
+export function handleSwap(transaction: Bytes, userAddress: Address, poolHash: Bytes, blockNumber: BigInt, transactionIndex: BigInt, timestamp: BigInt, 
+  isBuy: boolean, inBaseQty: boolean, qty: BigInt, limitPrice: BigInt | null, 
+  minOut: BigInt | null, baseFlow: BigInt, quoteFlow: BigInt, callSource: string, 
+  dex: string, canTouchDexDeposit: boolean): void {
   // Get unique entity ID
   const entityType = "swap"
   const callIndex = getNextCallIndex(entityType, transaction)
@@ -244,6 +255,11 @@ export function handleSwap(transaction: Bytes, userAddress: Address, poolHash: B
   if (dex === "croc") {
     handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.base), "swap")
     handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote), "swap")
+  }
+
+  if (canTouchDexDeposit) {
+    handleDexBalance(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.base), "swap")
+    handleDexBalance(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote), "swap")
   }
 
   const eventIndex = getNextCallIndex(AGG_ENTITY_LABEL, transaction)
@@ -284,6 +300,20 @@ export function handleBalanceChange(transaction: Bytes, blockNumber: BigInt, tim
     userBalance_.category = category
     userBalance_.save()
   }
+}
+
+export function handleDexBalance(transaction: Bytes, blockNumber: BigInt, timestamp: BigInt, user: Address, token: Address, category: string): void {
+  const balanceIndex = getNextCallIndex("DEX_BALANCE", transaction)
+  const balanceUpdate = new DexBalanceUpdate(getUniqueCallID(transaction, balanceIndex))
+  balanceUpdate.transactionHash = transaction
+  balanceUpdate.eventIndex = balanceIndex
+  balanceUpdate.block = blockNumber
+  balanceUpdate.time = timestamp
+  balanceUpdate.user = user
+  balanceUpdate.token = token
+  balanceUpdate.category = category
+  balanceUpdate.save()
+  saveCallIndex("DEX_BALANCE", transaction, balanceIndex)
 }
 
 export function handleFeeChange(transaction: Bytes, blockNumber: BigInt, timestamp: BigInt, poolHash: Bytes, feeRate: i32): void {
@@ -368,7 +398,8 @@ export function handleDirectSwapCall(call: SwapCall): void {
     call.outputs.baseQuote,
     call.outputs.quoteFlow,
     "hotpath",
-    "croc"
+    "croc",
+    call.inputs.reserveFlags > 0
   )
 }
 
@@ -389,7 +420,8 @@ export function handleDirectSwapEvent(event: CrocSwap): void {
     event.params.baseFlow,
     event.params.quoteFlow,
     "hotpath_event",
-    "croc"
+    "croc",
+    event.params.reserveFlags > 0
   )
 }
 
@@ -405,6 +437,7 @@ export function handleHotProxy(inputs: Bytes, baseFlow: BigInt, quoteFlow: BigIn
   const qty = params[5].toBigInt()
   const limitPrice = params[7].toBigInt()
   const minOut = params[8].toBigInt()
+  const reserveFlags = params[9].toI32()
   handleSwap(
     transaction.hash,
     transaction.from,
@@ -420,7 +453,8 @@ export function handleHotProxy(inputs: Bytes, baseFlow: BigInt, quoteFlow: BigIn
     baseFlow,
     quoteFlow,
     callSource,
-    "croc"
+    "croc",
+    reserveFlags > 0
   )
 }
 
@@ -440,6 +474,7 @@ export function handleHotProxyEvent(event: CrocHotCmd): void {
 export function handleColdPath(inputs: Bytes, transaction: ethereum.Transaction, block: ethereum.Block): void {
   const initPoolCode = 71
   const depositSurplusCode = 73
+  const withdrawSurplusCode = 74
   const transferSurplusCode = 75
 
   const cmdCode = inputs[31]
@@ -450,7 +485,7 @@ export function handleColdPath(inputs: Bytes, transaction: ethereum.Transaction,
     const poolIdx = params[3].toBigInt()
     createPool(base, quote, poolIdx, transaction, block)
 
-  } else if (cmdCode === depositSurplusCode || cmdCode === transferSurplusCode) {
+  } else if (cmdCode === depositSurplusCode) {
     const params = decodeAbi(inputs, "(uint8,address,uint128,address)")
     const recv = params[1].toAddress()
     const token = params[3].toAddress()
@@ -461,7 +496,81 @@ export function handleColdPath(inputs: Bytes, transaction: ethereum.Transaction,
       block.timestamp,
       recv,
       token,
-      cmdCode == depositSurplusCode ? "deposit" : "withdraw",
+      "deposit",
+    )
+
+    handleDexBalance(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      recv,
+      token,
+      "deposit",
+    )
+
+  } else if (cmdCode === withdrawSurplusCode) {
+    const params = decodeAbi(inputs, "(uint8,address,uint128,address)")
+    const recv = params[1].toAddress()
+    const token = params[3].toAddress()
+
+    handleBalanceChange(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      transaction.from,
+      token,
+      "withdraw",
+    )
+
+    handleDexBalance(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      transaction.from,
+      token,
+      "withdraw",
+    )
+
+  } else if (cmdCode === transferSurplusCode) {
+    const params = decodeAbi(inputs, "(uint8,address,uint128,address)")
+    const to = params[1].toAddress()
+    const token = params[3].toAddress()
+    const from = transaction.from
+
+    handleBalanceChange(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      from,
+      token,
+      "transfer_send",
+    )
+
+    handleBalanceChange(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      to,
+      token,
+      "transfer_recv",
+    )
+
+    handleDexBalance(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      from,
+      token,
+      "transfer_send",
+    )
+
+    handleDexBalance(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      to,
+      token,
+      "transfer_recv",
     )
   }
 }
@@ -551,6 +660,7 @@ export function handleWarmPath(inputs: Bytes, transaction: ethereum.Transaction,
     const bidTick = ambient ? 0 : params[4].toI32()
     const askTick = ambient ? 0 : params[5].toI32()
     const liq = params[6].toBigInt()
+    const reserveFlags = params[9].toI32()
     modifyLiquidity(
       transaction.hash,
       transaction.from,
@@ -566,7 +676,8 @@ export function handleWarmPath(inputs: Bytes, transaction: ethereum.Transaction,
       baseFlow,
       quoteFlow,
       callSource,
-      null
+      null,
+      reserveFlags > 0
     )
   }
 }
@@ -599,7 +710,8 @@ export function handleMicroPathsLiquidity(transaction: ethereum.Transaction, blo
     baseFlow,
     quoteFlow,
     callSource,
-    null
+    null,
+    true // Micropath calls roll into larger flash accoutning and must be assumed can potentially touch dex deposit
   )
 
 }
@@ -789,7 +901,8 @@ export function handleSweepSwapCall(call: SweepSwapCall): void {
     call.outputs.accum.baseFlow_,
     call.outputs.accum.quoteFlow_,
     "micropath",
-    "croc"
+    "croc",
+    true // Micropath calls roll into larger flash accoutning and must be assumed can potentially touch dex deposit
   )
 }
 
@@ -820,7 +933,8 @@ export function handleSweepSwapEvent(event: CrocMicroSwap): void {
     baseFlow,
     quoteFlow,
     "micropath_event",
-    "croc"
+    "croc",
+    true // Micropath calls roll into larger flash accoutning and must be assumed can potentially touch dex deposit
   )
 }
 
@@ -845,6 +959,7 @@ export function handleKnockoutCmd(inputs: Bytes, transaction: ethereum.Transacti
   const bidTick = params[4].toI32()
   const askTick = params[5].toI32()
   const isBid = params[6].toBoolean()
+  const reserveFlags = params[7].toI32()
 
   if (isMint || isBurn) {
     const liq = params[10].toBigInt()
@@ -863,7 +978,8 @@ export function handleKnockoutCmd(inputs: Bytes, transaction: ethereum.Transacti
       baseFlow,
       quoteFlow,
       callSource,
-      null
+      null,
+      reserveFlags > 0
     )
   } else if (isRecover) {
     const pivotTime = params[10].toBigInt()
@@ -882,7 +998,8 @@ export function handleKnockoutCmd(inputs: Bytes, transaction: ethereum.Transacti
       baseFlow,
       quoteFlow,
       callSource,
-      pivotTime
+      pivotTime,
+      reserveFlags > 0
     )
   }
 }
@@ -927,7 +1044,8 @@ export function handleKnockoutCross(event: CrocKnockoutCross): void {
     null,
     null,
     "knockoutcross",
-    event.params.pivotTime
+    event.params.pivotTime,
+    false
   )
 }
 
