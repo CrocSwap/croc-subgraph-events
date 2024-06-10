@@ -12,6 +12,7 @@ type Swap @entity(immutable: true) {
   time: BigInt!
   pool: Pool!
   isBuy: Boolean!
+  isVault: Boolean!
   inBaseQty: Boolean!
   qty: BigInt!
   limitPrice: BigDecimal
@@ -35,6 +36,7 @@ type LiquidityChange @entity(immutable: true) {
   callIndex: Int!
   pool: Pool!
   user: Bytes!
+  isVault: Boolean!
   block: BigInt!
   time: BigInt!
   positionType: String!
