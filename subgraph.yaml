@@ -4,7 +4,7 @@ schema:
 dataSources:
   - kind: ethereum
     name: CrocSwapDex
-    network: blast-mainnet
+    network: blast
     source:
       abi: CrocSwapDex
       address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
@@ -25,7 +25,7 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: HotProxy
-    network: blast-mainnet
+    network: blast
     source:
       abi: HotProxy
       address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
@@ -45,7 +45,7 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: ColdPath
-    network: blast-mainnet
+    network: blast
     source:
       abi: ColdPath
       address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
@@ -67,7 +67,7 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: WarmPath
-    network: blast-mainnet
+    network: blast
     source:
       abi: WarmPath
       address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
@@ -88,7 +88,7 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: MicroPaths
-    network: blast-mainnet
+    network: blast
     source:
       abi: MicroPaths
       address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
@@ -118,7 +118,7 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: KnockoutLiqPath
-    network: blast-mainnet
+    network: blast
     source:
       abi: KnockoutLiqPath
       address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
@@ -139,7 +139,7 @@ dataSources:
       file: ./src/mapping.ts
   - kind: ethereum
     name: KnockoutCounter
-    network: blast-mainnet
+    network: blast
     source:
       abi: KnockoutCounter
       address: "0xaAaaaAAAFfe404EE9433EEf0094b6382D81fb958"
