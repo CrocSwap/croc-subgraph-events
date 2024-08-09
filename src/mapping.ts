@@ -19,7 +19,7 @@ import { CrocKnockoutCmd } from "../generated/KnockoutLiqPath/KnockoutLiqPath"
 
 // Import interfaces for the KnockoutCross event
 import { CrocKnockoutCross } from "../generated/KnockoutCounter/KnockoutCounter"
-import { AggEvent, FeeChange, KnockoutCross, LatestIndex, LiquidityChange, Pool, PoolTemplate, Swap, UserBalance } from "../generated/schema"
+import { AggEvent, DexBalanceUpdate, FeeChange, KnockoutCross, LatestIndex, LiquidityChange, Pool, PoolTemplate, Swap, UserBalance } from "../generated/schema"
 
 /***************************** DATA MANIPULATION *****************************/
 // Conversions between different data types, unpacking packed data, etc.
@@ -99,8 +99,8 @@ export function getKnockoutCrossHash(block: BigInt, transaction: Bytes, poolHash
 }
 
 // Generates unique hash for a UserBalance object denoting that a given user has interacted with a given token
-export function getUserBalanceHash(user: Address, token: Address): Bytes {
-  return user.concat(token)
+export function getUserBalanceHash(user: Address, token: Address, category: string): Bytes {
+  return user.concat(token).concat(Bytes.fromByteArray(ByteArray.fromUTF8(category)))
 }
 
 export function getLatestIndexID(entityType: String, transaction: Bytes): Bytes {
@@ -149,7 +149,14 @@ export function saveCallIndex(entityType: String, transaction: Bytes, callIndex:
 
 // Handles liquidity modification (additions, burns, mints) via
 // LiquidityChange (per-transaction) entities
-export function modifyLiquidity(transaction: Bytes, userAddress: Address, blockNumber: BigInt, timestamp: BigInt, poolHash: Bytes, positionType: string, changeType: string, bidTick: i32, askTick: i32, isBid: boolean, liq: BigInt | null, baseFlow: BigInt | null, quoteFlow: BigInt | null, callSource: string, pivotTime: BigInt | null): void {
+export function modifyLiquidity(tx: ethereum.Transaction, blockNumber: BigInt, timestamp: BigInt, poolHash: Bytes, positionType: string, 
+  changeType: string, bidTick: i32, askTick: i32, isBid: boolean, liq: BigInt | null, 
+  baseFlow: BigInt | null, quoteFlow: BigInt | null, callSource: string, 
+  pivotTime: BigInt | null, canTouchDexDeposit: boolean): void {
+
+  const transaction = tx.hash
+  const userAddress = inferOwner(tx)
+
   // Get unique entity ID
   const entityType = "liquidityChange"
   const callIndex = getNextCallIndex(entityType, transaction)
@@ -160,6 +167,7 @@ export function modifyLiquidity(transaction: Bytes, userAddress: Address, blockN
   liquidityChange.callIndex = callIndex
   liquidityChange.pool = Pool.load(poolHash)!.id
   liquidityChange.user = userAddress
+  liquidityChange.isVault = !(tx.from == userAddress)
   liquidityChange.block = blockNumber
   liquidityChange.time = timestamp
   liquidityChange.changeType = changeType
@@ -178,9 +186,14 @@ export function modifyLiquidity(transaction: Bytes, userAddress: Address, blockN
   saveCallIndex(entityType, transaction, callIndex)
 
   if (changeType === "burn" || changeType === "harvest") {
-    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.base))
-    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote))
+    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.base), "burn")
+    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote), "burn")
   }
+
+  if (canTouchDexDeposit) {
+    handleDexBalance(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.base), changeType)
+    handleDexBalance(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote), changeType)
+  }  
 
   const eventIndex = getNextCallIndex(AGG_ENTITY_LABEL, transaction)
 
@@ -208,9 +221,13 @@ export function modifyLiquidity(transaction: Bytes, userAddress: Address, blockN
 }
 
 // Creates Swap entities
-export function handleSwap(transaction: Bytes, userAddress: Address, poolHash: Bytes, blockNumber: BigInt, transactionIndex: BigInt, timestamp: BigInt, isBuy: boolean, inBaseQty: boolean, qty: BigInt, limitPrice: BigInt | null, minOut: BigInt | null, baseFlow: BigInt, quoteFlow: BigInt, callSource: string, dex: string): void {
+export function handleSwap(tx: ethereum.Transaction, userAddress: Address, poolHash: Bytes, blockNumber: BigInt, transactionIndex: BigInt, timestamp: BigInt, 
+  isBuy: boolean, inBaseQty: boolean, qty: BigInt, limitPrice: BigInt | null, 
+  minOut: BigInt | null, baseFlow: BigInt, quoteFlow: BigInt, callSource: string, 
+  dex: string, canTouchDexDeposit: boolean): void {
   // Get unique entity ID
   const entityType = "swap"
+  const transaction = tx.hash
   const callIndex = getNextCallIndex(entityType, transaction)
 
   // Record the swap
@@ -218,6 +235,7 @@ export function handleSwap(transaction: Bytes, userAddress: Address, poolHash: B
   swap.transactionHash = transaction
   swap.callIndex = callIndex
   swap.user = userAddress
+  swap.isVault = !(tx.from == userAddress)
   swap.block = blockNumber
   swap.transactionIndex = transactionIndex
   swap.time = timestamp
@@ -242,8 +260,13 @@ export function handleSwap(transaction: Bytes, userAddress: Address, poolHash: B
   saveCallIndex(entityType, transaction, callIndex)
 
   if (dex === "croc") {
-    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.base))
-    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote))
+    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.base), "swap")
+    handleBalanceChange(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote), "swap")
+  }
+
+  if (canTouchDexDeposit) {
+    handleDexBalance(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.base), "swap")
+    handleDexBalance(transaction, blockNumber, timestamp, userAddress, Address.fromBytes(Pool.load(poolHash)!.quote), "swap")
   }
 
   const eventIndex = getNextCallIndex(AGG_ENTITY_LABEL, transaction)
@@ -271,8 +294,8 @@ export function handleSwap(transaction: Bytes, userAddress: Address, poolHash: B
   saveCallIndex(AGG_ENTITY_LABEL, transaction, eventIndex)
 }
 
-export function handleBalanceChange(transaction: Bytes, blockNumber: BigInt, timestamp: BigInt, user: Address, token: Address): void {
-  const balanceHash = getUserBalanceHash(user, token)
+export function handleBalanceChange(transaction: Bytes, blockNumber: BigInt, timestamp: BigInt, user: Address, token: Address, category: string): void {
+  const balanceHash = getUserBalanceHash(user, token, category)
   const userBalance = UserBalance.load(balanceHash)
   if (userBalance === null) {
     const userBalance_ = new UserBalance(balanceHash)
@@ -281,8 +304,23 @@ export function handleBalanceChange(transaction: Bytes, blockNumber: BigInt, tim
     userBalance_.time = timestamp
     userBalance_.user = user
     userBalance_.token = token
+    userBalance_.category = category
     userBalance_.save()
   }
+}
+
+export function handleDexBalance(transaction: Bytes, blockNumber: BigInt, timestamp: BigInt, user: Address, token: Address, category: string): void {
+  const balanceIndex = getNextCallIndex("DEX_BALANCE", transaction)
+  const balanceUpdate = new DexBalanceUpdate(getUniqueCallID(transaction, balanceIndex))
+  balanceUpdate.transactionHash = transaction
+  balanceUpdate.eventIndex = balanceIndex
+  balanceUpdate.block = blockNumber
+  balanceUpdate.time = timestamp
+  balanceUpdate.user = user
+  balanceUpdate.token = token
+  balanceUpdate.category = category
+  balanceUpdate.save()
+  saveCallIndex("DEX_BALANCE", transaction, balanceIndex)
 }
 
 export function handleFeeChange(transaction: Bytes, blockNumber: BigInt, timestamp: BigInt, poolHash: Bytes, feeRate: i32): void {
@@ -353,8 +391,8 @@ export function createPool(base: Address, quote: Address, poolIdx: BigInt,
 // Handler for a swap() call made to CrocSwapDex
 export function handleDirectSwapCall(call: SwapCall): void {
   handleSwap(
-    call.transaction.hash,
-    call.transaction.from,
+    call.transaction,
+    inferOwner(call.transaction),
     getPoolHash(call.inputs.base, call.inputs.quote, call.inputs.poolIdx),
     call.block.number,
     call.transaction.index,
@@ -367,15 +405,16 @@ export function handleDirectSwapCall(call: SwapCall): void {
     call.outputs.baseQuote,
     call.outputs.quoteFlow,
     "hotpath",
-    "croc"
+    "croc",
+    call.inputs.reserveFlags > 0
   )
 }
 
 // event CrocSwap (address indexed base, address indexed quote, uint256 poolIdx, bool isBuy, bool inBaseQty, uint128 qty, uint16 tip, uint128 limitPrice, uint128 minOut, uint8 reserveFlags, int128 baseFlow, int128 quoteFlow);
 export function handleDirectSwapEvent(event: CrocSwap): void {
   handleSwap(
-    event.transaction.hash,
-    event.transaction.from,
+    event.transaction,
+    inferOwner(event.transaction),
     getPoolHash(event.params.base, event.params.quote, event.params.poolIdx),
     event.block.number,
     event.transaction.index,
@@ -388,7 +427,8 @@ export function handleDirectSwapEvent(event: CrocSwap): void {
     event.params.baseFlow,
     event.params.quoteFlow,
     "hotpath_event",
-    "croc"
+    "croc",
+    event.params.reserveFlags > 0
   )
 }
 
@@ -404,9 +444,10 @@ export function handleHotProxy(inputs: Bytes, baseFlow: BigInt, quoteFlow: BigIn
   const qty = params[5].toBigInt()
   const limitPrice = params[7].toBigInt()
   const minOut = params[8].toBigInt()
+  const reserveFlags = params[9].toI32()
   handleSwap(
-    transaction.hash,
-    transaction.from,
+    transaction,
+    inferOwner(transaction),
     getPoolHash(base, quote, poolIdx),
     block.number,
     transaction.index,
@@ -419,7 +460,8 @@ export function handleHotProxy(inputs: Bytes, baseFlow: BigInt, quoteFlow: BigIn
     baseFlow,
     quoteFlow,
     callSource,
-    "croc"
+    "croc",
+    reserveFlags > 0
   )
 }
 
@@ -439,6 +481,7 @@ export function handleHotProxyEvent(event: CrocHotCmd): void {
 export function handleColdPath(inputs: Bytes, transaction: ethereum.Transaction, block: ethereum.Block): void {
   const initPoolCode = 71
   const depositSurplusCode = 73
+  const withdrawSurplusCode = 74
   const transferSurplusCode = 75
 
   const cmdCode = inputs[31]
@@ -449,7 +492,7 @@ export function handleColdPath(inputs: Bytes, transaction: ethereum.Transaction,
     const poolIdx = params[3].toBigInt()
     createPool(base, quote, poolIdx, transaction, block)
 
-  } else if (cmdCode === depositSurplusCode || cmdCode === transferSurplusCode) {
+  } else if (cmdCode === depositSurplusCode) {
     const params = decodeAbi(inputs, "(uint8,address,uint128,address)")
     const recv = params[1].toAddress()
     const token = params[3].toAddress()
@@ -459,7 +502,82 @@ export function handleColdPath(inputs: Bytes, transaction: ethereum.Transaction,
       block.number,
       block.timestamp,
       recv,
-      token
+      token,
+      "deposit",
+    )
+
+    handleDexBalance(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      recv,
+      token,
+      "deposit",
+    )
+
+  } else if (cmdCode === withdrawSurplusCode) {
+    const params = decodeAbi(inputs, "(uint8,address,uint128,address)")
+    const recv = params[1].toAddress()
+    const token = params[3].toAddress()
+
+    handleBalanceChange(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      inferOwner(transaction),
+      token,
+      "withdraw",
+    )
+
+    handleDexBalance(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      inferOwner(transaction),
+      token,
+      "withdraw",
+    )
+
+  } else if (cmdCode === transferSurplusCode) {
+    const params = decodeAbi(inputs, "(uint8,address,uint128,address)")
+    const to = params[1].toAddress()
+    const token = params[3].toAddress()
+    const from = inferOwner(transaction)
+
+    handleBalanceChange(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      from,
+      token,
+      "transfer_send",
+    )
+
+    handleBalanceChange(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      to,
+      token,
+      "transfer_recv",
+    )
+
+    handleDexBalance(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      from,
+      token,
+      "transfer_send",
+    )
+
+    handleDexBalance(
+      transaction.hash,
+      block.number,
+      block.timestamp,
+      to,
+      token,
+      "transfer_recv",
     )
   }
 }
@@ -531,6 +649,22 @@ export function handleColdPathProtocolCmdEvent(event: CrocColdProtocolCmd): void
   handleColdPathProtocolCmd(event.params.input, event.transaction, event.block)
 }
 
+// Infers the end-user caller based on whether an EOA directly called the CrocSwap contract
+// or if the call was made to an external router contract.
+function inferOwner (transaction: ethereum.Transaction): Address {
+  const CROC_ADDR_PREFIX = "0xaaaaaaa"
+  const toAddr = transaction.to
+  const fromAddr = transaction.from
+
+  if (toAddr === null) { 
+    return fromAddr
+  } else if (toAddr.toHexString().toLowerCase().startsWith(CROC_ADDR_PREFIX)) {
+    return fromAddr
+  } else {
+    return toAddr
+  }
+}
+
 /******************* HANDLERS FOR WARMPATH USERCMD() CALLS *******************/
 
 export function handleWarmPath(inputs: Bytes, transaction: ethereum.Transaction, block: ethereum.Block, baseFlow: BigInt, quoteFlow: BigInt, callSource: string): void {
@@ -549,9 +683,10 @@ export function handleWarmPath(inputs: Bytes, transaction: ethereum.Transaction,
     const bidTick = ambient ? 0 : params[4].toI32()
     const askTick = ambient ? 0 : params[5].toI32()
     const liq = params[6].toBigInt()
+    const reserveFlags = params[9].toI32()
+
     modifyLiquidity(
-      transaction.hash,
-      transaction.from,
+      transaction,
       block.number,
       block.timestamp,
       poolHash,
@@ -564,7 +699,8 @@ export function handleWarmPath(inputs: Bytes, transaction: ethereum.Transaction,
       baseFlow,
       quoteFlow,
       callSource,
-      null
+      null,
+      reserveFlags > 0
     )
   }
 }
@@ -583,8 +719,7 @@ export function handleWarmPathEvent(event: CrocWarmCmd): void {
 
 export function handleMicroPathsLiquidity(transaction: ethereum.Transaction, block: ethereum.Block, poolHash: Bytes, positionType: string, changeType: string, bidTick: i32, askTick: i32, liq: BigInt, baseFlow: BigInt, quoteFlow: BigInt, callSource: string): void {
   modifyLiquidity(
-    transaction.hash,
-    transaction.from,
+    transaction,
     block.number,
     block.timestamp,
     poolHash,
@@ -597,7 +732,8 @@ export function handleMicroPathsLiquidity(transaction: ethereum.Transaction, blo
     baseFlow,
     quoteFlow,
     callSource,
-    null
+    null,
+    true // Micropath calls roll into larger flash accoutning and must be assumed can potentially touch dex deposit
   )
 
 }
@@ -773,8 +909,8 @@ export function handleBurnAmbientEvent(event: CrocMicroBurnAmbient): void {
 // Handler for a MicroPaths sweepSwap() call (as part of a long-form order) that performs a swap operation on a single pool
 export function handleSweepSwapCall(call: SweepSwapCall): void {
   handleSwap(
-    call.transaction.hash,
-    call.transaction.from,
+    call.transaction,
+    inferOwner(call.transaction),
     call.inputs.pool.hash_,
     call.block.number,
     call.transaction.index,
@@ -787,7 +923,8 @@ export function handleSweepSwapCall(call: SweepSwapCall): void {
     call.outputs.accum.baseFlow_,
     call.outputs.accum.quoteFlow_,
     "micropath",
-    "croc"
+    "croc",
+    true // Micropath calls roll into larger flash accoutning and must be assumed can potentially touch dex deposit
   )
 }
 
@@ -804,8 +941,8 @@ export function handleSweepSwapEvent(event: CrocMicroSwap): void {
   const quoteFlow = outputs[1].toBigInt() 
 
   handleSwap(
-    event.transaction.hash,
-    event.transaction.from,
+    event.transaction,
+    inferOwner(event.transaction),
     poolHash,
     event.block.number,
     event.transaction.index,
@@ -818,7 +955,8 @@ export function handleSweepSwapEvent(event: CrocMicroSwap): void {
     baseFlow,
     quoteFlow,
     "micropath_event",
-    "croc"
+    "croc",
+    true // Micropath calls roll into larger flash accoutning and must be assumed can potentially touch dex deposit
   )
 }
 
@@ -843,12 +981,12 @@ export function handleKnockoutCmd(inputs: Bytes, transaction: ethereum.Transacti
   const bidTick = params[4].toI32()
   const askTick = params[5].toI32()
   const isBid = params[6].toBoolean()
+  const reserveFlags = params[7].toI32()
 
   if (isMint || isBurn) {
     const liq = params[10].toBigInt()
     modifyLiquidity(
-      transaction.hash,
-      transaction.from,
+      transaction,
       block.number,
       block.timestamp,
       poolHash,
@@ -861,13 +999,13 @@ export function handleKnockoutCmd(inputs: Bytes, transaction: ethereum.Transacti
       baseFlow,
       quoteFlow,
       callSource,
-      null
+      null,
+      reserveFlags > 0
     )
   } else if (isRecover) {
     const pivotTime = params[10].toBigInt()
     modifyLiquidity(
-      transaction.hash,
-      transaction.from,
+      transaction,
       block.number,
       block.timestamp,
       poolHash,
@@ -880,7 +1018,8 @@ export function handleKnockoutCmd(inputs: Bytes, transaction: ethereum.Transacti
       baseFlow,
       quoteFlow,
       callSource,
-      pivotTime
+      pivotTime,
+      reserveFlags > 0
     )
   }
 }
@@ -911,8 +1050,7 @@ export function handleKnockoutCross(event: CrocKnockoutCross): void {
   cross.save()
   
   modifyLiquidity(
-    event.transaction.hash,
-    event.transaction.from,
+    event.transaction,
     event.block.number,
     event.block.timestamp,
     event.params.pool,
@@ -925,7 +1063,8 @@ export function handleKnockoutCross(event: CrocKnockoutCross): void {
     null,
     null,
     "knockoutcross",
-    event.params.pivotTime
+    event.params.pivotTime,
+    false
   )
 }
 
