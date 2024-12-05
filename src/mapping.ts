@@ -339,7 +339,7 @@ export function handleFeeChange(transaction: Bytes, blockNumber: BigInt, timesta
   feeChange.feeRate = feeRate
   feeChange.save()
 
-  const agg = new AggEvent(getUniqueCallID(transaction, callIndex))
+  const agg = new AggEvent(getUniqueCallID(transaction, eventIndex))
   agg.transactionHash = transaction
   agg.eventIndex = eventIndex
   agg.block = blockNumber
